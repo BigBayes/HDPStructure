@@ -99,13 +99,20 @@ function [POPULATION,RESULTS]=HDPStructure(X,dist,varargin)
 %                   burnin is completed is given by 'skip'. In particular,
 %                   only every 'skip'-th iteration will be collected after
 %                   burnin. The default value for 'skip' is 5. The value of
-%                   skip must divide iters-burnin.
+%                   skip must divide iters-burnin.  The value of burnin
+%                   must be less than the value of iters --- the total
+%                   number of samples used for the posterior estimates is
+%                   (iters-burnin)/skip.
 %
 %           seed scalar. For reproducibility, a seed for the random number
 %                   generator driving the MCMC may be provided. If the seed
 %                   is not provided, or if the seed provided is <=0, then
 %                   the state of matlab's random number generator is not
 %                   modified prior to the commencement of the MCMC.
+%
+%           CORES scalar. Number of cores to use in parallel. Defaults to
+%                   one core. The number of cores should be less than or
+%                   equal to N.
 %
 % Outputs:
 %           POPULATION NxTxD. This array contains the population assignment
@@ -156,6 +163,7 @@ default_iters=10000;
 default_burnin=5000;
 default_skip=5;
 default_seed=0;
+default_cores=1;
 addRequired(parser,'X',@ismatrix);
 addRequired(parser,'dist',@isvector);
 addOptional(parser,'initpop',default_initpop);
@@ -171,6 +179,7 @@ addOptional(parser,'iters',default_iters,@isnumeric);
 addOptional(parser,'burnin',default_burnin,@isnumeric);
 addOptional(parser,'skip',default_skip,@isnumeric);
 addOptional(parser,'seed',default_seed,@isnumeric);
+addOptional(parser,'cores',default_cores,@isnumeric);
 parse(parser,X,dist,varargin{:});
 initpop=parser.Results.initpop;
 alp0=parser.Results.alp0;
@@ -203,10 +212,26 @@ upL=parser.Results.upL;
 iters=parser.Results.iters;
 burnin=parser.Results.burnin;
 skip=parser.Results.skip;
+
+
+if burnin >= iters
+    error('Number of burnin samples should be <= number of iterations.');
+end
+
+if mod(iters, skip) ~= 0
+    error('Number of skipped (thinned) samples should divide number of iterations.');
+end
+
 seed=parser.Results.seed;
 if seed>0
     s=RandStream('mt19937ar','Seed',seed);
     RandStream.setGlobalStream(s);
+end
+
+cores=parser.Results.cores;
+
+if cores > 1
+    parpool(cores);
 end
 
 %%%% Initialize first sample --- if initpop is provided, copy it.
@@ -296,12 +321,22 @@ for iter = 1:iters
         error('Mismatch between actual and expected number of populations after padding.');
     end
     
-    for i=1:n
-        [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),THETA,lambda);
-        Ztmp(i,:)=Z';
-        Sold(i,:)=S';
-        NTOT(i,:)=ninew;
-        MTOT(i,:)=minew;
+    if cores == 1
+        for i=1:n
+            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),THETA,lambda);
+            Ztmp(i,:)=Z';
+            Sold(i,:)=S';
+            NTOT(i,:)=ninew;
+            MTOT(i,:)=minew;
+        end
+    else
+        parfor i=1:n
+            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),THETA,lambda);
+            Ztmp(i,:)=Z';
+            Sold(i,:)=S';
+            NTOT(i,:)=ninew;
+            MTOT(i,:)=minew;
+        end
     end
     
     Zold=Ztmp;
@@ -394,3 +429,9 @@ RESULTS=struct( ...
     'THETASAMP', THETASAMP, ...
     'POPNOMI', POPNOMI ...
 );
+
+
+
+if cores > 1
+    delete(gcp);
+end

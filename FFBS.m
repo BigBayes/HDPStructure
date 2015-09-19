@@ -1,6 +1,6 @@
-function [Znew,Snew]=FFBS(weig,lambda,THETA,x)
+function [Znew,Snew]=FFBS(weig,lambda,LTHETA1,LTHETA0,x)
 %FFBS Forwards filtering-backwards sampling.
-%   [Znew,Snew]=FFBS(weig,lambda,THETA,x), Propose new row of population 
+%   [Znew,Snew]=FFBS(weig,lambda,THETA1,THETA0,x), Propose new row of population 
 %       assignments for a given individual using the forwards filtering-
 %       backwards sampling algorithm.
 
@@ -13,31 +13,19 @@ T=length(x);
 PROB=zeros(T,K);
 M0=zeros(T,K);
 M1=zeros(T,K);
-tmp=THETA(1,:);
-
-%%%% Snap to zero.
-l=tmp<10^-300;
-tmp(l)=10^-300;
-l=tmp>.99999;
-tmp(l)=.99999;
-PROB(1,:)=exp(log(pesi)+x(1)*log(tmp)+(1-x(1))*log(1-tmp));
+PROB(1,:)=exp(log(pesi)+x(1)*LTHETA1(1,:)+(1-x(1))*LTHETA0(1,:));
 
 %%%% Forwards filtering pass.
 for t=2:T
-    l=PROB((t-1),:)<10^-300;
-    PROB((t-1),l)=10^-300;
-    tmp=THETA(t,:);
-    l=tmp<10^-300;
-    tmp(l)=10^-300;
-    l=tmp>0.99999;
-    tmp(l)=0.99999;
-    lm1=-lambda(t)+log(PROB((t-1),:))+x(t)*log(tmp)+(1-x(t))*log(1-tmp);
+    PROB(t-1,PROB(t-1,:)<10^-300)=10^-300;
+    LPROB=log(PROB(t-1,:));
+    lm1=-lambda(t)+LPROB + ...
+        x(t)*LTHETA1(t,:)+(1-x(t))*LTHETA0(t,:);
+    
     m1=exp(lm1);
-    lp=log(PROB((t-1),:));
-    mp=max(lp);
-    nc=mp+log(sum(exp(lp-mp)));
+    nc=logsumexp1(LPROB);
     lm0=nc+log((1-exp(-lambda(t)))) + ...
-        log(pesi)+x(t)*log(tmp)+(1-x(t))*log(1-tmp);
+        log(pesi)+x(t)*LTHETA1(t,:)+(1-x(t))*LTHETA0(t,:);
     
     m0=exp(lm0);
     mp=max(lm0,lm1);
@@ -54,7 +42,7 @@ k=discrnd(PROB(T,:)/sum(PROB(T,:)));
 Znew(T)=k;
 lprob_s=log(M1(T,k))-log(PROB(T,k));
 prob_s=exp(lprob_s);
-s=rand< prob_s;
+s=rand<prob_s;
 Snew(T)=s;
 for i=1:(T-1)
     ind=T-i;

@@ -14,5 +14,19 @@ function x=discrnd(lambda)
 %   Copyright (c) 2015, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
 %       and Yee Whye Teh.
 
-assert(abs(sum(lambda)-1.0)<1e-8);
-x=find(mnrnd(1,lambda));
+u = rand();
+cdf = lambda(1);
+if cdf >= u
+    x = 1;
+    return;
+end
+
+for index = 2:numel(lambda)
+    cdf = cdf + lambda(index);
+    if cdf >= u
+        x = index;
+        return;
+    end
+end
+
+assert(0);

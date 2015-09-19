@@ -189,6 +189,15 @@ bet=parser.Results.bet;
 a0init=parser.Results.a0init;
 b0init=parser.Results.b0init;
 
+try
+    logsumexp1([1 2 3 4]);
+catch ME %#ok
+    cwd = pwd();
+    cd(mfilename('fullpath'));
+    mex logsumexp1.c;
+    cd(cwd);
+end
+
 % Initialize a0 and b0 from empirical measures, if they aren't provided.
 if isempty(a0init)
     pm=mean(X);
@@ -231,7 +240,12 @@ end
 cores=parser.Results.cores;
 
 if cores > 1
-    parpool(cores);
+    try
+        parpool(cores);
+    catch ME %#ok
+        delete(gcp);
+        parpool(cores);
+    end
 end
 
 %%%% Initialize first sample --- if initpop is provided, copy it.
@@ -321,9 +335,17 @@ for iter = 1:iters
         error('Mismatch between actual and expected number of populations after padding.');
     end
     
+    % Moved outside FFBS
+    tmp=THETA;
+    l=tmp<10^-300;
+    tmp(l)=10^-300;
+    l=tmp>.99999;
+    tmp(l)=.99999;
+    tmp1 = log(tmp);
+    tmp0 = log(1-tmp);
     if cores == 1
         for i=1:n
-            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),THETA,lambda);
+            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
             NTOT(i,:)=ninew;
@@ -331,7 +353,7 @@ for iter = 1:iters
         end
     else
         parfor i=1:n
-            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),THETA,lambda);
+            [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
             NTOT(i,:)=ninew;

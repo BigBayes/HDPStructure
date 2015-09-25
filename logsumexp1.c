@@ -27,12 +27,12 @@ int validate(int nlhs,
         return 1;
     } else if (mxIsEmpty(prhs[0])) {
         plhs[0] = mxCreateDoubleScalar(NAN);
-        return 0;
+        return 1;
     }
     return 0;
 }
 
-inline void logsumexp(int nlhs,
+void logsumexp(int nlhs,
         mxArray *plhs[],
         int nrhs,
         const mxArray *prhs[]) {
@@ -41,12 +41,13 @@ inline void logsumexp(int nlhs,
     double *x = mxGetPr(prhs[0]);
     double max = x[0];
     double y = 0.0;
-    for (size_t i = 1; i < n; i++) {
+    size_t i;
+    for (i = 1; i < n; i++) {
         if (x[i] > max) {
             max = x[i];
         }
     }
-    for (size_t i = 0; i < n; i++) {
+    for (i = 0; i < n; i++) {
         y += exp(x[i] - max);
     }
     plhs[0] = mxCreateDoubleScalar(log(y) + max);

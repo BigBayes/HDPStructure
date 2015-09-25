@@ -193,7 +193,7 @@ try
     logsumexp1([1 2 3 4]);
 catch ME %#ok
     cwd = pwd();
-    cd(mfilename('fullpath'));
+    cd(fileparts(mfilename('fullpath')));
     mex logsumexp1.c;
     cd(cwd);
 end

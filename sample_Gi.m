@@ -1,4 +1,4 @@
-function [Znew,Snew,ninew,minew]=sample_Gi(xi,alpha,Zi_old,Si_old,pi0,ni,THETA,lambda)
+function [Znew,Snew,ninew,minew]=sample_Gi(xi,alpha,Zi_old,Si_old,pi0,ni,LTHETA1,LTHETA0,lambda)
 %SAMPLE_GI Perform HM sampling for a bottom level DP in the hierarchy.
 
 %   Copyright (c) 2015, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
@@ -17,8 +17,7 @@ Ci=unifrnd(0,piminold);
 pitmp=pi(1:K);
 l=pitmp>Ci;
 pesi=pitmp(l);
-thetatmp=THETA(:,l);
-[Ztmp,Snew]=FFBS(pesi,lambda,thetatmp,xi);
+[Ztmp,Snew]=FFBS(pesi,lambda,LTHETA1(:,l),LTHETA0(:,l),xi);
 
 %%%% Change the k in Znew to the original numbering of the populations.
 Znew=zeros(T,1);

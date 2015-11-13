@@ -106,6 +106,10 @@
                   the state of matlab's random number generator is not
                   modified prior to the commencement of the MCMC.
 
+          cores scalar. Number of cores to use in parallel. Defaults to
+                  one core. The number of cores should be less than or
+                  equal to N.
+
        Outputs:
           POPULATION NxTxD. This array contains the population assignment
                   of the individuals in the population for each state in

@@ -7,10 +7,20 @@ v=0.1;
 
 %%%% Prior on log(lam) is uniform on the range [lowL, upL]. Posterior\
 %%%% density of lam is 1/(y*(upL-lowL))
-ll=truncnorm(log(lamold),v,lowL,upL);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% ADAPTATION
+%u=rand;
+%if u < 0.05
+ %   ll=truncnorm(log(lamold),v,lowL,upL);
+%else
+ %  ll=truncnorm(log(lamold),varll*(2.38^2) ,lowL,upL);
+%end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ll=truncnorm(log(lamold),v ,lowL,upL);
 lam=exp(ll);
 lpriorold=-log(lamold);
 lpriornew=-log(lam);
+lprop=log(trunc_norm_ab_pdf( log(lamold), ll, v, lowL,upL )) - log(trunc_norm_ab_pdf( ll,log(lamold) , v, lowL,upL ));
 [~,T]=size(S);
 llikenew=0;
 llikeold=0;
@@ -28,7 +38,7 @@ for i=2:T
 end
 lpostnew=lpriornew+llikenew;
 lpostold=lpriorold+llikeold;
-lacpt=lpostnew-lpostold;
+lacpt=lpostnew-lpostold+lprop;
 if rand>exp(lacpt)
     lam=lamold;
 end

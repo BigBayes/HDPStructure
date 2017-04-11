@@ -10,9 +10,14 @@ function x=discrnd(lambda)
 %
 % Outputs:
 %           x scalar. The random draw for x.
-
-%   Copyright (c) 2015, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
+%
+%   Copyright (c) 2017, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
 %       and Yee Whye Teh.
+%
+%
+%   Change log:
+%
+%       March 2017: Added warning for numerical issues in normalization.
 
 u = rand();
 cdf = lambda(1);
@@ -29,4 +34,5 @@ for index = 2:numel(lambda)
     end
 end
 
-assert(0);
+warning('Numerical issue in normalization (%g != 1)', sum(lambda(:)));
+[~, x] = nanmax(lambda(:)); % return the MAP

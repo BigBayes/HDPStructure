@@ -13,15 +13,15 @@ function [POPULATION,RESULTS]=HDPStructure(X,dist,varargin)
 %                   indicates the distance between allele t-1 and allele t.
 %                   The value of dist(1) is unused.
 %
-%           'PARAMETER', VALUE, ... Additional optional arguments must be
+%           'parameter', VALUE, ... Additional optional arguments must be
 %                   provided as additional arguments to the call to the
 %                   HDPStructure function in 'PARAMETER', VALUE, ... pairs.
-%                   In each pair, 'PARAMETER' specifies which parameter to
+%                   In each pair, 'parameter' specifies which parameter to
 %                   set, and VALUE specifies the value of that parameter.
 %                   The parameters recognised by HDPStructure are listed as
 %                   follows:
 %
-%           initpop NxT. The initialization for the population assignment.
+%           initpop Nx1. The initialization for the population assignment.
 %                   If you wish to start the MCMC chain at a population
 %                   assignment which is already close to a mode, then that
 %                   population assignment can be provided by the 'initpop'
@@ -110,7 +110,12 @@ function [POPULATION,RESULTS]=HDPStructure(X,dist,varargin)
 %                   the state of matlab's random number generator is not
 %                   modified prior to the commencement of the MCMC.
 %
-%           CORES scalar. Number of cores to use in parallel. Defaults to
+%           verbosity scalar. Frequency or toggle for per iteration
+%                   information. 0 = don't print anything, 1 = print every
+%                   progress every 100-th iteration (default), 2 = print
+%                   every iteration.
+%
+%           cores scalar. Number of cores to use in parallel. Defaults to
 %                   one core. The number of cores should be less than or
 %                   equal to N.
 %
@@ -145,7 +150,7 @@ function [POPULATION,RESULTS]=HDPStructure(X,dist,varargin)
 %           > %     MCMC chain.
 %           > disp(POPULATION(:,:,end));
 
-%   Copyright (c) 2015, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
+%   Copyright (c) 2017, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
 %       and Yee Whye Teh.
 
 [n,T]=size(X);
@@ -163,6 +168,7 @@ default_iters=10000;
 default_burnin=5000;
 default_skip=5;
 default_seed=0;
+default_verbosity=1;
 default_cores=1;
 addRequired(parser,'X',@ismatrix);
 addRequired(parser,'dist',@isvector);
@@ -179,6 +185,7 @@ addOptional(parser,'iters',default_iters,@isnumeric);
 addOptional(parser,'burnin',default_burnin,@isnumeric);
 addOptional(parser,'skip',default_skip,@isnumeric);
 addOptional(parser,'seed',default_seed,@isnumeric);
+addOptional(parser,'verbosity',default_verbosity,@isnumeric);
 addOptional(parser,'cores',default_cores,@isnumeric);
 parse(parser,X,dist,varargin{:});
 initpop=parser.Results.initpop;
@@ -231,22 +238,44 @@ if mod(iters, skip) ~= 0
     error('Number of skipped (thinned) samples should divide number of iterations.');
 end
 
-seed=parser.Results.seed;
-if seed>0
-    s=RandStream('mt19937ar','Seed',seed);
-    RandStream.setGlobalStream(s);
-end
-
 cores=parser.Results.cores;
 
 if cores > 1
     try
         parpool(cores);
     catch ME %#ok
-        delete(gcp);
-        parpool(cores);
+        try
+            delete(gcp);
+            parpool(cores);
+        catch ME %#ok
+            
+        end
     end
 end
+
+if cores > 1
+    spmd
+        seed=parser.Results.seed;
+        if seed<=0
+            seed = randi(1e7);
+        end
+        s=RandStream.create('mrg32k3a','Seed', seed, 'NumStreams', n + 1);
+        RandStream.setGlobalStream(s);
+        s=RandStream.getGlobalStream();
+        s.Substream=n+1;
+    end
+else
+    seed=parser.Results.seed;
+    if seed<=0
+        seed = randi(1e7);
+    end
+    s=RandStream.create('mrg32k3a','Seed', seed, 'NumStreams', n + 1);
+    RandStream.setGlobalStream(s);
+    s=RandStream.getGlobalStream();
+    s.Substream=n+1;
+end
+
+verbosity=parser.Results.verbosity;
 
 %%%% Initialize first sample --- if initpop is provided, copy it.
 if ~isempty(initpop)
@@ -313,7 +342,7 @@ indice=0;
 
 %%%% Main loop for MCMC.
 for iter = 1:iters
-    if mod(iter,100)==0
+    if (mod(iter,100)==0 && verbosity == 1) || (verbosity >= 2)
         fprintf(1, 'Iteration %d/%d\n', iter, iters);
     end
     
@@ -345,6 +374,8 @@ for iter = 1:iters
     tmp0 = log(1-tmp);
     if cores == 1
         for i=1:n
+            s=RandStream.getGlobalStream();
+            s.Substream=i;
             [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
@@ -353,12 +384,36 @@ for iter = 1:iters
         end
     else
         parfor i=1:n
+            s=RandStream.getGlobalStream();
+            s.Substream=i;
+            %RandStream.setDefaultStream(s);
+            
+     %stream = RandStream.create('mt19937ar', 'NumStreams', n, 'StreamIndices',ind);
+     %RandStream.setDefaultStream(stream);
+     
             [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
             NTOT(i,:)=ninew;
             MTOT(i,:)=minew;
         end
+    end
+    s=RandStream.getGlobalStream();
+    s.Substream=1;
+            %RandStream.setDefaultStream(s);
+    
+    if verbosity >= 2
+        KK = unique(reshape(Ztmp, 1, []));
+        props = [];
+        for k = KK
+            props = [props sum(reshape(Ztmp, [], 1) == k)/T/n];
+        end
+        props = sort(props);
+        for k = 1:length(KK)
+            fprintf('%f ', props(k));
+        end
+        fprintf('jumps: %d', T*n - sum(Sold(:)));
+        fprintf('\n');
     end
     
     Zold=Ztmp;
@@ -441,19 +496,19 @@ for i=1:K
 end
 
 %%%% Save results of MCMC sampling in a structure.
-RESULTS=struct( ...
-    'INDSAMP', INDSAMP, ...
+RESULTS=struct('INDSAMP', INDSAMP, ...
     'KSAMP', KSAMP, ...
     'ALPHA0SAMP', ALPHA0SAMP, ...
     'ALPHASAMP', ALPHASAMP, ...
     'RECOMSAMP', RECOMSAMP, ...
     'MEANBASE', MEANBASE, ...
     'THETASAMP', THETASAMP, ...
-    'POPNOMI', POPNOMI ...
-);
-
-
+    'POPNOMI', POPNOMI);
 
 if cores > 1
-    delete(gcp);
+    try
+        delete(gcp);
+    catch ME %#ok
+        
+    end
 end

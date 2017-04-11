@@ -12,7 +12,11 @@ function theta=dirichrnd(alpha)
 
 %   Copyright (c) 2015, Maria De Iorio, Lloyd T. Elliott, Stefano Favaro
 %       and Yee Whye Teh.
-
-assert(all(alpha(:)>0));
+%
+%
+%   Change log:
+%
+%       March 2017: Allow 0 values in alpha.
+ 
 g=gamrnd(alpha,1);
 theta=g/sum(g);

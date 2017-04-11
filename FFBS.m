@@ -38,6 +38,8 @@ end
 %%%% Backwards sampling pass.
 Znew=zeros(T,1);
 Snew=zeros(T,1);
+assert(~any(isnan(PROB(:))));
+assert(~any(isinf(PROB(:))));
 k=discrnd(PROB(T,:)/sum(PROB(T,:)));
 Znew(T)=k;
 lprob_s=log(M1(T,k))-log(PROB(T,k));

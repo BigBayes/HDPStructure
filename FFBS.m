@@ -14,10 +14,11 @@ PROB=zeros(T,K);
 M0=zeros(T,K);
 M1=zeros(T,K);
 PROB(1,:)=exp(log(pesi)+x(1)*LTHETA1(1,:)+(1-x(1))*LTHETA0(1,:));
-
+assert(~any(isnan(PROB(1,:))));
 %%%% Forwards filtering pass.
 for t=2:T
     PROB(t-1,PROB(t-1,:)<10^-300)=10^-300;
+    assert(~any(isnan(PROB(t-1,:))));
     LPROB=log(PROB(t-1,:));
     lm1=-lambda(t)+LPROB + ...
         x(t)*LTHETA1(t,:)+(1-x(t))*LTHETA0(t,:);
@@ -31,6 +32,7 @@ for t=2:T
     mp=max(lm0,lm1);
     temp=mp+log(exp(lm0-mp)+exp(lm1-mp));
     PROB(t,:)=exp(temp);
+    assert(~any(isnan(PROB(t-1,:))));
     M1(t,:)=m1;
     M0(t,:)=m0;
 end

@@ -33,7 +33,7 @@ ll=zeros(MAXCLUS,1);
 clus=ones(N,MAXCLUS);
 for i=2:MAXCLUS
     d = pdist(X);
-    z = linkage(d);
+    z = linkage(d, 'complete');
     c = cluster(z,'maxclust',i);
     
     %%%% Save the population assignment.

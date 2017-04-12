@@ -253,27 +253,16 @@ if cores > 1
     end
 end
 
-if cores > 1
-    spmd
-        seed=parser.Results.seed;
-        if seed<=0
-            seed = randi(1e7);
-        end
-        s=RandStream.create('mrg32k3a','Seed', seed, 'NumStreams', n + 1);
-        RandStream.setGlobalStream(s);
-        s=RandStream.getGlobalStream();
-        s.Substream=n+1;
-    end
-else
-    seed=parser.Results.seed;
-    if seed<=0
-        seed = randi(1e7);
-    end
-    s=RandStream.create('mrg32k3a','Seed', seed, 'NumStreams', n + 1);
-    RandStream.setGlobalStream(s);
-    s=RandStream.getGlobalStream();
-    s.Substream=n+1;
+seed = parser.Results.seed;
+if seed<=0
+    seed = randi(1e7);
 end
+
+rng(seed, 'twister');
+
+seeds = randi(2^32, iters, n + 1, 'uint32');
+seeds(:) = seeds(randperm(iters * (n + 1)));
+
 
 verbosity=parser.Results.verbosity;
 
@@ -374,8 +363,7 @@ for iter = 1:iters
     tmp0 = log(1-tmp);
     if cores == 1
         for i=1:n
-            s=RandStream.getGlobalStream();
-            s.Substream=i;
+            rng(seeds(iter, i), 'twister');
             [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
@@ -384,13 +372,7 @@ for iter = 1:iters
         end
     else
         parfor i=1:n
-            s=RandStream.getGlobalStream();
-            s.Substream=i;
-            %RandStream.setDefaultStream(s);
-            
-     %stream = RandStream.create('mt19937ar', 'NumStreams', n, 'StreamIndices',ind);
-     %RandStream.setDefaultStream(stream);
-     
+            rng(seeds(iter, i), 'twister');
             [Z,S,ninew,minew]=sample_Gi(X(i,:),alpha,Ztmp(i,:),Sold(i,:),pi0,NTOT(i,:),tmp1,tmp0,lambda);
             Ztmp(i,:)=Z';
             Sold(i,:)=S';
@@ -398,10 +380,8 @@ for iter = 1:iters
             MTOT(i,:)=minew;
         end
     end
-    s=RandStream.getGlobalStream();
-    s.Substream=1;
-            %RandStream.setDefaultStream(s);
-    
+    rng(seeds(iter, n + 1), 'twister');
+            
     if verbosity >= 2
         KK = unique(reshape(Ztmp, 1, []));
         props = [];
